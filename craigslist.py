@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from urllib2 import urlopen
+from urllib.request import urlopen
 from datetime import datetime
 import csv
 import sys
@@ -8,17 +8,16 @@ import smtplib
 import config
 
 # Craigslist search URL
-BASE_URL = ('http://chicago.craigslist.org/search/'
-            '?sort=rel&areaID=11&subAreaID=&query={0}&catAbb=sss')
+BASE_URL = ('https://vancouver.craigslist.org/search/sss?query={}')
 
 def parse_results(search_term):
     results = []
     search_term = search_term.strip().replace(' ', '+')
     search_url = BASE_URL.format(search_term)
-    soup = BeautifulSoup(urlopen(search_url).read())
-    rows = soup.find('div', 'content').find_all('p', 'row')
+    soup = BeautifulSoup(urlopen(search_url).read(), features='html.parser')
+    rows = soup.find_all('li', 'result-row')
     for row in rows:
-        url = 'http://chicago.craigslist.org' + row.a['href']
+        url = 'http://vancouver.craigslist.org' + row.a['href']
         # price = row.find('span', class_='price').get_text()
         create_date = row.find('time').get('datetime')
         title = row.find_all('a')[1].get_text()
@@ -52,10 +51,10 @@ def has_new_records(results):
     return is_new
 
 def send_text(phone_number, msg):
-    fromaddr = "Craigslist Checker"
-    toaddrs = phone_number + "@txt.att.net"
+    fromaddr = ""
+    toaddrs = ""
     msg = ("From: {0}\r\nTo: {1}\r\n\r\n{2}").format(fromaddr, toaddrs, msg)
-    server = smtplib.SMTP('smtp.gmail.com:587')
+    server = smtplib.SMTP('smtp-mail.outlook.com:587')
     server.starttls()
     server.login(config.email['username'], config.email['password'])
     server.sendmail(fromaddr, toaddrs, msg)
@@ -67,13 +66,13 @@ def get_current_time():
 if __name__ == '__main__':
     try:
         TERM = sys.argv[1]
-        PHONE_NUMBER = sys.argv[2].strip().replace('-', '')
+        PHONE_NUMBER = sys.argv[2].strip()
     except:
-        print "You need to include a search term and a 10-digit phone number!\n"
+        print("You need to include a search term and a 10-digit phone number!\n")
         sys.exit(1)
 
     if len(PHONE_NUMBER) != 10:
-        print "Phone numbers must be 10 digits!\n"
+        print("Phone numbers must be 10 digits!\n")
         sys.exit(1)
 
     results = parse_results(TERM)
@@ -81,8 +80,8 @@ if __name__ == '__main__':
     # Send the SMS message if there are new results
     if has_new_records(results):
         message = "Hey - there are new Craigslist posts for: {0}".format(TERM.strip())
-        print "[{0}] There are new results - sending text message to {0}".format(get_current_time(), PHONE_NUMBER)
+        print("[{0}] There are new results - sending text message to {0}".format(get_current_time(), PHONE_NUMBER))
         send_text(PHONE_NUMBER, message)
         write_results(results)
     else:
-        print "[{0}] No new results - will try again later".format(get_current_time())
+        print("[{0}] No new results - will try again later".format(get_current_time()))
